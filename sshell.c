@@ -58,25 +58,24 @@ int sys_call(char cmd[])
                 return 0;      
         }
         
-        //redirction stdout to specfic file
-        int fd;
-        int fd2;
-        if (redirection_detect(argu_array)){
+        
                 
-                fd = open(argu_array[i-1],
-                O_WRONLY| O_CREAT,0644);
-                dup2(fd, STDOUT_FILENO);
-                close(fd);
-                argu_array[i-1] = NULL;
-                argu_array[i-2] = NULL;
-        }                    
         /* fork + exec + wait */
         pid_t pid;     
 
         pid = fork();
         if (pid == 0) {
                 /* Child process
-                end after execution */                
+                end after execution */ 
+                int fd;
+                if (redirection_detect(argu_array)){ //redirction stdout to specfic file
+                        fd = open(argu_array[i-1],
+                        O_WRONLY| O_CREAT,0644);
+                        dup2(fd, STDOUT_FILENO);
+                        close(fd);
+                        argu_array[i-1] = NULL;
+                        argu_array[i-2] = NULL;
+                }              
                 execvp(cmd_copy, argu_array); 
                 perror("execvp");
                 exit(1);
