@@ -3,7 +3,24 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <dirent.h>
+#include <fcntl.h>
+
 #define CMDLINE_MAX 512
+
+int redirection_detect(char** argu) // whether ">" is appeared in the command line
+{
+        int i = 0;
+        while( argu[i] != NULL )
+        {
+                if(!strcmp(argu[i], ">")){
+                        printf("redir\n");
+                        return 1;
+                }
+                i++;
+        }
+        return 0;
+}
 
 int sys_call(char cmd[])
 {
@@ -25,15 +42,41 @@ int sys_call(char cmd[])
         }
         argu_array[i] = NULL; // add a NULL in the end of the argument array => char *args[] = {"date", NULL} 
         
-
-        /* fork + exec + wait */
-        pid_t pid;
+        // Build-in function pwd and cd
+        if (!strcmp(cmd_copy, "pwd")) {
+                char cwd[PATH_MAX];
+                getcwd(cwd,sizeof(cwd));
+                fprintf(stdout, "%s\n",cwd);
+                fprintf(stderr, "+ completed '%s' [%d]\n",
+                        cmd, 0);
+                return 0;
+        } 
+        if (!strcmp(cmd_copy, "cd")) {                     
+                int rc = chdir(argu_array[1]);
+                fprintf(stderr, "+ completed '%s' [%d]\n",
+                        cmd, rc);
+                return 0;      
+        }
+        
+        //redirction stdout to specfic file
+        int fd;
+        int fd2;
+        if (redirection_detect(argu_array)){
                 
+                fd = open(argu_array[i-1],
+                O_WRONLY| O_CREAT,0644);
+                dup2(fd, STDOUT_FILENO);
+                close(fd);
+                argu_array[i-1] = NULL;
+                argu_array[i-2] = NULL;
+        }                    
+        /* fork + exec + wait */
+        pid_t pid;     
 
         pid = fork();
         if (pid == 0) {
                 /* Child process
-                end after execution */
+                end after execution */                
                 execvp(cmd_copy, argu_array); 
                 perror("execvp");
                 exit(1);
@@ -58,6 +101,7 @@ int main(void)
         char cmd[CMDLINE_MAX];
 
         while (1) {
+                
                 char *nl;
                 //int retval;
 
@@ -84,6 +128,8 @@ int main(void)
                         fprintf(stderr, "Bye...\n");
                         break;
                 }
+
+
 
                 // move the whole session of fork+wait+exec into helper function sys_call
                 sys_call(cmd); // require modified
