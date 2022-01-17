@@ -8,16 +8,11 @@
 
 #define CMDLINE_MAX 512
 
-int redirection_detect(char** argu) // whether ">" is appeared in the command line
-{
-        int i = 0;
-        while( argu[i] != NULL )
-        {
-                if(!strcmp(argu[i], ">")){
-                        printf("redir\n");
-                        return 1;
-                }
-                i++;
+int redirection_detect(char* argu) // whether ">" is appeared in the command line
+{    
+        if(strstr(argu, ">")){
+                printf("redir\n");
+                return 1;
         }
         return 0;
 }
@@ -27,21 +22,82 @@ int sys_call(char cmd[])
         // make a copy of cmd
         char cmd_copy[CMDLINE_MAX];
         strcpy(cmd_copy, cmd);
-
-        /* split command pushed from user to */
         char *token;
-        token = strtok(cmd_copy, " ");
-        
+        char* redirection_array[17];
         char* argu_array[17]; // need to be released
-        int i = 0;
-
-        while( token != NULL ) {
-                argu_array[i] = token;
-                token = strtok(NULL, " ");
-                i++;
-        }
-        argu_array[i] = NULL; // add a NULL in the end of the argument array => char *args[] = {"date", NULL} 
         
+        // phase 4
+        // echo a>test.txt // dup2 recover problem // do not stdout sshell
+        // echo a > test.txt // '\0' problem
+        // need a helper function to split the char[] ?
+        // release all temp variable, for next command
+
+        // redirction stdout to specfic file
+        int fd;
+        int fd2;
+        if (redirection_detect(cmd_copy)){
+                // resplit the argu_array
+                // make an argu_array copy
+                token = strtok(cmd_copy, ">");
+                int i = 0;
+
+                while( token != NULL ) {
+                        redirection_array[i] = token;
+                        token = strtok(NULL, ">");
+                        i++;
+                }
+                
+                // example cmd : echo a b c > test.txt
+                // split with >, get an array of ["echo a b c", "test.txt"]
+                // take array[0] as new cmd, array[1] as redirection
+
+                int j = 0;
+                printf("r_array: ");
+                while(j < i) {
+                        printf("%s\n",redirection_array[j]);
+                        j++;
+                }
+                printf("\n");
+
+                // char* new_argu_array = redirection_array[0];
+                printf("new_argu_array: %s\n", redirection_array[0]);
+                printf("r_array[i]: %s\n", redirection_array[i-1]);
+
+                // empty the token
+                token = NULL;
+                token = strtok(redirection_array[0], " ");
+                i = 0;
+                while( token != NULL ) {
+                        argu_array[i] = token;
+                        token = strtok(NULL, " ");
+                        i++;
+                }
+
+                j = 0;
+                printf("argu_array: ");
+                while(j < i) {
+                        printf("%s\n",argu_array[j]);
+                        j++;
+                }
+                printf("\n");
+
+                fd = open(redirection_array[i-1], O_WRONLY| O_CREAT,0644);
+                dup2(fd, STDOUT_FILENO);
+                close(fd);
+                // argu_array[i-1] = NULL;
+                // argu_array[i-2] = NULL;
+        } else {
+                // split command pushed from user
+                token = strtok(cmd_copy, " ");
+                int i = 0;
+                while( token != NULL ) {
+                        argu_array[i] = token;
+                        token = strtok(NULL, " ");
+                        i++;
+                }
+                argu_array[i] = NULL; // add a NULL in the end of the argument array => char *args[] = {"date", NULL} 
+        }
+
         // Build-in function pwd and cd
         if (!strcmp(cmd_copy, "pwd")) {
                 char cwd[PATH_MAX];
@@ -58,21 +114,9 @@ int sys_call(char cmd[])
                 return 0;      
         }
         
-        //redirction stdout to specfic file
-        int fd;
-        int fd2;
-        if (redirection_detect(argu_array)){
-                
-                fd = open(argu_array[i-1],
-                O_WRONLY| O_CREAT,0644);
-                dup2(fd, STDOUT_FILENO);
-                close(fd);
-                argu_array[i-1] = NULL;
-                argu_array[i-2] = NULL;
-        }                    
+
         /* fork + exec + wait */
         pid_t pid;     
-
         pid = fork();
         if (pid == 0) {
                 /* Child process
