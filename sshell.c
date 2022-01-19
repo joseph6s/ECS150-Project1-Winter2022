@@ -8,40 +8,87 @@
 
 #define CMDLINE_MAX 512
 
+struct parse{
+        int redir_index;
+        int pipe_index;
+        char *command;
+        char **argument;
+        char *redir_arr;
+        char **pipe_arr;
+};
+
+int sys_call(char cmd[]);
+void cmd_parse(char cmd[], struct parse *parse_input);
+
 int redirection_detect(char* argu) // whether ">" is appeared in the command line
 {    
         if(strstr(argu, ">")){
-                printf("redir\n");
                 return 1;
         }
         return 0;
 }
 
-int sys_call(char cmd[])
-{
+int pipeline_detect(char* argu) // whether ">" is appeared in the command line
+{    
+        if(strstr(argu, "|")){
+                return 1;
+        }
+        return 0;
+}
+
+void pipeline(char* process1, char* process2){
+        struct parse proc1;
+        struct parse proc2;
+        printf("111\n");
+        cmd_parse(process1,&proc1);
+        cmd_parse(process2,&proc2);
+        printf("33333\n");
+        int fd[2];
+        pipe(fd);
+        if(fork() != 0){
+                printf("parent\n");
+                close(fd[0]);
+                dup2(fd[1], STDOUT_FILENO);
+                close(fd[1]);  
+                execvp(proc1.command,proc1.argument);
+        } else {
+                printf("child\n");
+                close(fd[1]);
+                dup2(fd[0], STDIN_FILENO);
+                close(fd[0]);
+                execvp(proc2.command,proc2.argument);
+        }
+}
+
+
+
+void cmd_parse(char cmd[], struct parse *parse_input) {
+        
         // make a copy of cmd
         char cmd_copy[CMDLINE_MAX];
         strcpy(cmd_copy, cmd);
         char *token;
         char* redirection_array[17];
         char* argu_array[17]; // need to be released
-        
-        // phase 4
-        // echo a>test.txt // dup2 recover problem // do not stdout sshell
-        // echo a > test.txt // '\0' problem
-        // need a helper function to split the char[] ?
-        // release all temp variable, for next command
+        char* pipe_array[17];
 
         // redirction stdout to specfic file
-        int fd;
+
         int redir_index = 0;
         int i = 0;
-        if (redirection_detect(cmd_copy)){
+        int pipe_index = pipeline_detect(cmd);
+        if (pipe_index) {
+                token = strtok(cmd_copy, "|");
+                while( token != NULL ) {
+                        pipe_array[i] = token;
+                        token = strtok(NULL, "|");
+                        printf("2222\n");
+                        i++;
+                }        
+        } else if (redirection_detect(cmd_copy)){
                 // resplit the argu_array
                 // make an argu_array copy
                 token = strtok(cmd_copy, ">");
-                
-
                 while( token != NULL ) {
                         redirection_array[i] = token;
                         token = strtok(NULL, ">");
@@ -55,24 +102,6 @@ int sys_call(char cmd[])
                         redirection_array[i-1] = token;
                 }
 
-                // example cmd : echo a b c > test.txt
-                // split with >, get an array of ["echo a b c", "test.txt"]
-                // take array[0] as new cmd, array[1] as redirection
-
-                /*
-                int j = 0;
-                printf("r_array: ");
-                while(j < i) {
-                        printf("%s\n",redirection_array[j]);
-                        j++;
-                }
-                printf("\n");
-
-                // char* new_argu_array = redirection_array[0];
-                printf("new_argu_array: %s\n", redirection_array[0]);
-                printf("r_array[i]: %s\n", redirection_array[i-1]);
-                */
-
                 // empty the token
                 token = NULL;
                 token = strtok(redirection_array[0], " ");
@@ -84,20 +113,7 @@ int sys_call(char cmd[])
                 }
                 argu_array[j] = NULL;
 
-                /*
-                j = 0;
-                printf("argu_array: ");
-                while(j < i) {
-                        printf("%s\n",argu_array[j]);
-                        j++;
-                }
-                printf("\n"); 
-                */
-
                 redir_index = 1;
-
-                // argu_array[i-1] = NULL;
-                // argu_array[i-2] = NULL;
         } else {
                 // split command pushed from user
                 token = strtok(cmd_copy, " ");
@@ -108,9 +124,25 @@ int sys_call(char cmd[])
                 }
                 argu_array[i] = NULL; // add a NULL in the end of the argument array => char *args[] = {"date", NULL} 
         }
+        
+        parse_input->pipe_index = pipe_index;
+        parse_input->redir_index = redir_index;
+        parse_input->command = cmd_copy;
+        parse_input->argument = argu_array;
+        parse_input->redir_arr = redirection_array[i-1];
+        parse_input->pipe_arr = pipe_array;
 
+}
+
+
+
+int sys_call(char cmd[])
+{
+        int fd;
+        struct parse parse_rc;
+        cmd_parse(cmd,&parse_rc);
         // Build-in function pwd and cd
-        if (!strcmp(cmd_copy, "pwd")) {
+        if (!strcmp(parse_rc.command, "pwd")) {
                 char cwd[PATH_MAX];
                 getcwd(cwd,sizeof(cwd));
                 fprintf(stdout, "%s\n",cwd);
@@ -118,14 +150,14 @@ int sys_call(char cmd[])
                         cmd, 0);
                 return 0;
         } 
-        if (!strcmp(cmd_copy, "cd")) {                     
-                int rc = chdir(argu_array[1]);
+        if (!strcmp(parse_rc.command, "cd")) {                     
+                int rc = chdir((parse_rc.argument)[1]);
                 fprintf(stderr, "+ completed '%s' [%d]\n",
                         cmd, rc);
                 return 0;      
         }
-
-
+        char *process1;
+        char *process2;
         /* fork + exec + wait */
         pid_t pid;     
         pid = fork();
@@ -133,12 +165,44 @@ int sys_call(char cmd[])
 
                 /* Child process
                 // end after execution */
-                if (redir_index == 1){
-                        fd = open(redirection_array[i-1], O_WRONLY| O_CREAT,0644);
+
+                if (parse_rc.pipe_index == 1) {
+                        process1 = parse_rc.pipe_arr[0];
+                        process2 = parse_rc.pipe_arr[1];
+                        struct parse proc1;
+                        struct parse proc2;
+                        printf("111\n");
+                        cmd_parse(process1,&proc1);
+                        cmd_parse(process2,&proc2);
+                        printf("33333\n");
+                        int fd[2];
+                        pipe(fd);
+                        if(fork() != pid){
+                                printf("parent\n");
+                                close(fd[0]);
+                                dup2(fd[1], STDOUT_FILENO);
+                                close(fd[1]);  
+                                execvp(proc1.command,proc1.argument);
+                                int status;
+                                waitpid(pid, &status, 0);
+                                fprintf(stderr, "+ completed '%s' [%d]\n",
+                                        cmd, WEXITSTATUS(status));
+                        } else {
+                                printf("child\n");
+                                close(fd[1]);
+                                dup2(fd[0], STDIN_FILENO);
+                                close(fd[0]);
+                                execvp(proc2.command,proc2.argument);
+                        }
+                } else if (parse_rc.redir_index == 1) {
+                        fd = open(parse_rc.redir_arr, O_WRONLY| O_CREAT,0644);
                         dup2(fd, STDOUT_FILENO);
                         close(fd);
-                }            
-                execvp(cmd_copy, argu_array); 
+                        execvp(parse_rc.command, parse_rc.argument);
+                } else {
+                        execvp(parse_rc.command, parse_rc.argument);
+                }
+
                 perror("execvp");
                 exit(1);
         } else if (pid > 0) {
@@ -148,6 +212,7 @@ int sys_call(char cmd[])
                 */
                 int status;
                 waitpid(pid, &status, 0);
+                printf("============\n");
                 fprintf(stderr, "+ completed '%s' [%d]\n",
                         cmd, WEXITSTATUS(status));
         } else {
@@ -160,7 +225,6 @@ int sys_call(char cmd[])
 int main(void)
 {
         char cmd[CMDLINE_MAX];
-
         while (1) {
                 
                 char *nl;
@@ -187,10 +251,10 @@ int main(void)
                 /* Builtin command */
                 if (!strcmp(cmd, "exit")) {
                         fprintf(stderr, "Bye...\n");
+                        fprintf(stderr, "+ completed '%s' [%d]\n",
+                                cmd, 0);
                         break;
                 }
-
-
 
                 // move the whole session of fork+wait+exec into helper function sys_call
                 sys_call(cmd); // require modified
