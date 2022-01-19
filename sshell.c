@@ -39,20 +39,16 @@ int pipeline_detect(char* argu) // whether ">" is appeared in the command line
 void pipeline(char* process1, char* process2){
         struct parse proc1;
         struct parse proc2;
-        printf("111\n");
         cmd_parse(process1,&proc1);
         cmd_parse(process2,&proc2);
-        printf("33333\n");
         int fd[2];
         pipe(fd);
         if(fork() != 0){
-                printf("parent\n");
                 close(fd[0]);
                 dup2(fd[1], STDOUT_FILENO);
                 close(fd[1]);  
                 execvp(proc1.command,proc1.argument);
         } else {
-                printf("child\n");
                 close(fd[1]);
                 dup2(fd[0], STDIN_FILENO);
                 close(fd[0]);
@@ -82,7 +78,6 @@ void cmd_parse(char cmd[], struct parse *parse_input) {
                 while( token != NULL ) {
                         pipe_array[i] = token;
                         token = strtok(NULL, "|");
-                        printf("2222\n");
                         i++;
                 }        
         } else if (redirection_detect(cmd_copy)){
@@ -171,14 +166,11 @@ int sys_call(char cmd[])
                         process2 = parse_rc.pipe_arr[1];
                         struct parse proc1;
                         struct parse proc2;
-                        printf("111\n");
                         cmd_parse(process1,&proc1);
                         cmd_parse(process2,&proc2);
-                        printf("33333\n");
                         int fd[2];
                         pipe(fd);
                         if(fork() != pid){
-                                printf("parent\n");
                                 close(fd[0]);
                                 dup2(fd[1], STDOUT_FILENO);
                                 close(fd[1]);  
@@ -188,7 +180,6 @@ int sys_call(char cmd[])
                                 fprintf(stderr, "+ completed '%s' [%d]\n",
                                         cmd, WEXITSTATUS(status));
                         } else {
-                                printf("child\n");
                                 close(fd[1]);
                                 dup2(fd[0], STDIN_FILENO);
                                 close(fd[0]);
@@ -212,7 +203,6 @@ int sys_call(char cmd[])
                 */
                 int status;
                 waitpid(pid, &status, 0);
-                printf("============\n");
                 fprintf(stderr, "+ completed '%s' [%d]\n",
                         cmd, WEXITSTATUS(status));
         } else {
