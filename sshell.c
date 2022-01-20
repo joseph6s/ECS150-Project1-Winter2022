@@ -17,6 +17,15 @@ struct parse{
         char **pipe_arr;
 };
 
+void empty_struct(struct parse *input){
+        input->argument = NULL;
+        input->command = NULL;
+        input->pipe_arr = NULL;
+        input->redir_arr = NULL;
+        input->redir_index = 0;
+        input->pipe_index = 0;
+}
+
 int sys_call(struct parse parse_rc);
 void cmd_parse(char cmd[], struct parse *parse_input);
 
@@ -48,14 +57,15 @@ void pipeline(char* process1, char* process2){
                 dup2(fd[1], STDOUT_FILENO);
                 close(fd[1]);
                 execvp(proc1.command ,proc1.argument);
+                empty_struct(&proc1);
         } else {
                 cmd_parse(process2,&proc2);
                 close(fd[1]);
                 dup2(fd[0], STDIN_FILENO);
                 close(fd[0]);
                 execvp(proc2.command ,proc2.argument);
+                empty_struct(&proc2);
         }
-
 
 }
 
@@ -73,17 +83,40 @@ void cmd_parse(char cmd[], struct parse *parse_input) {
 
         // redirction stdout to specfic file
 
-        int redir_index = 0;
         int i = 0;
-        int pipe_index = pipeline_detect(cmd);
+        int pipe_index = pipeline_detect(cmd_copy);
+        int redir_index = redirection_detect(cmd_copy);
         if (pipe_index) {
-                token = strtok(cmd_copy, "|");
-                while( token != NULL ) {
-                        pipe_array[i] = token;
-                        token = strtok(NULL, "|");
-                        i++;
+                if(strstr(cmd_copy, " | ")){
+                        token = strtok(cmd_copy, " | ");
+                        while( token != NULL ) {
+                                pipe_array[i] = token;
+                                token = strtok(NULL, " | ");
+                                i++;
+                        }     
+                } else if(strstr(cmd_copy, " |")){
+                        token = strtok(cmd_copy, " |");
+                        while( token != NULL ) {
+                                pipe_array[i] = token;
+                                token = strtok(NULL, " |");
+                                i++; 
+                        }
+                } else if(strstr(cmd_copy, "| ")) {
+                        token = strtok(cmd_copy, "| ");
+                        while( token != NULL ) {
+                                pipe_array[i] = token;
+                                token = strtok(NULL, "| ");
+                                i++; 
+                        }
+                } else {
+                        token = strtok(cmd_copy, "|");
+                        while( token != NULL ) {
+                                pipe_array[i] = token;
+                                token = strtok(NULL, "|");
+                                i++;   
+                        }
                 }        
-        } else if (redirection_detect(cmd_copy)){
+        } else if (redir_index){
                 // resplit the argu_array
                 // make an argu_array copy
                 token = strtok(cmd_copy, ">");
@@ -110,8 +143,6 @@ void cmd_parse(char cmd[], struct parse *parse_input) {
                         j++;
                 }
                 argu_array[j] = NULL;
-
-                redir_index = 1;
         } else {
                 // split command pushed from user
                 token = strtok(cmd_copy, " ");
@@ -161,9 +192,9 @@ int sys_call(struct parse parse_rc)
                 /* Child process
                 // end after execution */
                         if (parse_rc.redir_index == 1) {
-                        fd = open(parse_rc.redir_arr, O_WRONLY| O_CREAT,0644);
-                        dup2(fd, STDOUT_FILENO);
-                        close(fd);
+                                fd = open(parse_rc.redir_arr, O_WRONLY| O_CREAT,0644);
+                                dup2(fd, STDOUT_FILENO);
+                                close(fd);
                         }
                         execvp(parse_rc.command, parse_rc.argument);
                         perror("execvp");
@@ -181,7 +212,7 @@ int sys_call(struct parse parse_rc)
                 perror("fork");
                 exit(1);
         }
-
+        empty_struct(&parse_rc);
 
         return 0;
 }
@@ -248,7 +279,7 @@ int main(void)
                         perror("fork");
                         exit(1);
                 }
-
+                empty_struct(&cmd_line);
         }
         return EXIT_SUCCESS;
 }
