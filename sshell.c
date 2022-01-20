@@ -17,7 +17,7 @@ struct parse{
         char **pipe_arr;
 };
 
-int sys_call(char cmd[]);
+int sys_call(struct parse parse_rc);
 void cmd_parse(char cmd[], struct parse *parse_input);
 
 int redirection_detect(char* argu) // whether ">" is appeared in the command line
@@ -39,21 +39,24 @@ int pipeline_detect(char* argu) // whether ">" is appeared in the command line
 void pipeline(char* process1, char* process2){
         struct parse proc1;
         struct parse proc2;
-        cmd_parse(process1,&proc1);
-        cmd_parse(process2,&proc2);
+        
         int fd[2];
         pipe(fd);
         if(fork() != 0){
+                cmd_parse(process1,&proc1);
                 close(fd[0]);
                 dup2(fd[1], STDOUT_FILENO);
-                close(fd[1]);  
-                execvp(proc1.command,proc1.argument);
+                close(fd[1]);
+                execvp(proc1.command ,proc1.argument);
         } else {
+                cmd_parse(process2,&proc2);
                 close(fd[1]);
                 dup2(fd[0], STDIN_FILENO);
                 close(fd[0]);
-                execvp(proc2.command,proc2.argument);
+                execvp(proc2.command ,proc2.argument);
         }
+
+
 }
 
 
@@ -131,71 +134,40 @@ void cmd_parse(char cmd[], struct parse *parse_input) {
 
 
 
-int sys_call(char cmd[])
+int sys_call(struct parse parse_rc)
 {
         int fd;
-        struct parse parse_rc;
-        cmd_parse(cmd,&parse_rc);
         // Build-in function pwd and cd
         if (!strcmp(parse_rc.command, "pwd")) {
                 char cwd[PATH_MAX];
                 getcwd(cwd,sizeof(cwd));
                 fprintf(stdout, "%s\n",cwd);
                 fprintf(stderr, "+ completed '%s' [%d]\n",
-                        cmd, 0);
+                        parse_rc.command, 0);
                 return 0;
         } 
         if (!strcmp(parse_rc.command, "cd")) {                     
                 int rc = chdir((parse_rc.argument)[1]);
                 fprintf(stderr, "+ completed '%s' [%d]\n",
-                        cmd, rc);
+                        parse_rc.command, rc);
                 return 0;      
         }
-        char *process1;
-        char *process2;
+        //char *process1;
+        //char *process2;
         /* fork + exec + wait */
         pid_t pid;     
         pid = fork();
         if (pid == 0) {
-
                 /* Child process
                 // end after execution */
-
-                if (parse_rc.pipe_index == 1) {
-                        process1 = parse_rc.pipe_arr[0];
-                        process2 = parse_rc.pipe_arr[1];
-                        struct parse proc1;
-                        struct parse proc2;
-                        cmd_parse(process1,&proc1);
-                        cmd_parse(process2,&proc2);
-                        int fd[2];
-                        pipe(fd);
-                        if(fork() != pid){
-                                close(fd[0]);
-                                dup2(fd[1], STDOUT_FILENO);
-                                close(fd[1]);  
-                                execvp(proc1.command,proc1.argument);
-                                int status;
-                                waitpid(pid, &status, 0);
-                                fprintf(stderr, "+ completed '%s' [%d]\n",
-                                        cmd, WEXITSTATUS(status));
-                        } else {
-                                close(fd[1]);
-                                dup2(fd[0], STDIN_FILENO);
-                                close(fd[0]);
-                                execvp(proc2.command,proc2.argument);
-                        }
-                } else if (parse_rc.redir_index == 1) {
+                        if (parse_rc.redir_index == 1) {
                         fd = open(parse_rc.redir_arr, O_WRONLY| O_CREAT,0644);
                         dup2(fd, STDOUT_FILENO);
                         close(fd);
+                        }
                         execvp(parse_rc.command, parse_rc.argument);
-                } else {
-                        execvp(parse_rc.command, parse_rc.argument);
-                }
-
-                perror("execvp");
-                exit(1);
+                        perror("execvp");
+                        exit(1);
         } else if (pid > 0) {
                 /* Parent process
                 wait for Child
@@ -204,11 +176,13 @@ int sys_call(char cmd[])
                 int status;
                 waitpid(pid, &status, 0);
                 fprintf(stderr, "+ completed '%s' [%d]\n",
-                        cmd, WEXITSTATUS(status));
+                        parse_rc.command, WEXITSTATUS(status));
         } else {
                 perror("fork");
                 exit(1);
         }
+
+
         return 0;
 }
 
@@ -216,7 +190,6 @@ int main(void)
 {
         char cmd[CMDLINE_MAX];
         while (1) {
-                
                 char *nl;
                 //int retval;
 
@@ -245,10 +218,37 @@ int main(void)
                                 cmd, 0);
                         break;
                 }
+                struct parse cmd_line;
+                cmd_parse(cmd,&cmd_line);
 
                 // move the whole session of fork+wait+exec into helper function sys_call
-                sys_call(cmd); // require modified
-        }
+                pid_t pid;     
+                pid = fork();
+                if (pid == 0) {
 
+                        /* Child process
+                        // end after execution */
+                        if (cmd_line.pipe_index == 1){
+                                pipeline(cmd_line.pipe_arr[0],cmd_line.pipe_arr[1]);
+                        }
+                        else{
+                                sys_call(cmd_line);
+                        }
+                        
+                } else if (pid > 0) {
+                        /* Parent process
+                        wait for Child
+                        print finish statement
+                        */
+                        int status;
+                        waitpid(pid, &status, 0);
+                        fprintf(stderr, "+ completed '%s' [%d]\n",
+                        cmd, WEXITSTATUS(status));
+                } else {
+                        perror("fork");
+                        exit(1);
+                }
+
+        }
         return EXIT_SUCCESS;
 }
