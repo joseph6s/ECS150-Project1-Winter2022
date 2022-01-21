@@ -214,8 +214,10 @@ int sys_call(struct parse parse_rc,char*cmd) // defined sys_call function, inclu
                         exit(1);
                 }
                 while((dep = readdir(streamp)) != NULL) {
-                        stat(dep->d_name, &s);
-                        printf("%s (%ld bytes)\n", dep->d_name,s.st_size);
+                        if(strcmp(dep->d_name, ".") && strcmp(dep->d_name, "..")) {
+                                stat(dep->d_name, &s);
+                                printf("%s (%ld bytes)\n", dep->d_name,s.st_size);      
+                        }
                 }
                 if (closedir(streamp)) {
                         exit(1);
