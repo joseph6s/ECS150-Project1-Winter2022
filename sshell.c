@@ -20,6 +20,8 @@ struct parse{
 
 int sys_call(struct parse parse_rc,char* cmd);
 struct parse cmd_parse(char cmd[]);
+int stat(const char *filename, struct stat *buf);
+int fstat(int fd, struct stat *buf);
 
 int redirection_detect(char* argu) // whether ">" is appeared in the command line
 {    
@@ -232,8 +234,29 @@ int sys_call(struct parse parse_rc,char*cmd)
                         cmd,rc);
                 return 0;      
         }
-        //char *process1;
-        //char *process2;
+        // Build-in function sls
+        if (!strcmp(parse_rc.command, "sls")) {                     
+                char cwd[PATH_MAX];
+                getcwd(cwd,sizeof(cwd)); // get current working directory
+                DIR *streamp;
+                struct dirent *dep;
+                struct stat s;
+                if (!(streamp = opendir(cwd))){
+                        exit(1);
+                }
+                while((dep = readdir(streamp)) != NULL){
+                        stat(dep->d_name, &s);
+                        printf("%s (%ld bytes)\n", dep->d_name,s.st_size);
+                }
+                if (closedir(streamp)) {
+                        exit(1);
+                }
+
+                fprintf(stderr, "+ completed '%s' [%d]\n",
+                        cmd,0);
+                return 0;      
+        }
+
         /* fork + exec + wait */
         pid_t pid;     
         pid = fork();
