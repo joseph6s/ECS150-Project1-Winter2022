@@ -1,9 +1,9 @@
 ### Project 1 
 
 1. Overall design choices
-⋅⋅⋅The very first thing we did is use the combination of exec(),fork(),and wait() to substitude the high level call system(). After that we break the command into two cases - with pipeline and without pipeline.
+⋅⋅⋅ The very first thing we did is use the combination of exec(),fork(),and wait() to substitude the high level call system(). After that we break the command into two cases - with pipeline and without pipeline.
 2. Parse the command
-⋅⋅⋅To differ different cases of command, we created a function called cmd_parse(). It takes the command line as the only argument and returns a struct parse. This function would will parse the command input and break them into element we need to use later , and assign these values to struct element. And finally return the strcut.
+⋅⋅⋅ To differ different cases of command, we created a function called cmd_parse(). It takes the command line as the only argument and returns a struct parse. This function would will parse the command input and break them into element we need to use later , and assign these values to struct element. And finally return the strcut.
 3. sys_call()
 ⋅⋅⋅ sys_call is the first helper function we wrote. When we wrote the function, we simply want it to perform like the system and did not consider the case of pipeline. Therefore, this function is straight-forward. It will take the parsed struct output and the original command line, and execute the command. It will only be called when the command has no pipeline arguments. It use the structure of the combination of exec(),fork(),and wait().
 4. pipeline()
