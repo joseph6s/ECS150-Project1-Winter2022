@@ -11,6 +11,6 @@
 5. Redirection
 ⋅⋅⋅ Redirection part is simply. We just use one elemnt of struct called redir_index to check whether a redirection is needed, then execute the redirection process by using dup2(). If redir_index = 1, we need redirect the stdout. If redir_index = 2, we need to redirect the stderr. 
 6. Build-in function
-⋅⋅⋅ we sinmply used getcwd and chdir
+⋅⋅⋅ we simply used getcwd and chdir
 7. sls
-⋅⋅⋅  
+⋅⋅⋅  sls is a quite straight forward function, most of thing is done by built-in library <dirent.h> and <unistd.h>. for getting file name in the working directory, we used DIR to obtain the directory pointer from opendir() and struct dirent to access the names of files in the directory. both of them are from the library <dirent.h>. for getting the file size, we used struct stat to access the size of each file. finally, for each file in the directory, we can print the filename and file size easily.
