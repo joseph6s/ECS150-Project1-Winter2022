@@ -23,7 +23,10 @@ struct parse cmd_parse(char cmd[]);
 
 int redirection_detect(char* argu) // whether ">" is appeared in the command line
 {    
-        if(strstr(argu, ">")){
+        if(strstr(argu, "&")){
+                return 2;
+        }
+        else if (strstr(argu, "&")){
                 return 1;
         }
         return 0;
@@ -109,7 +112,7 @@ struct parse cmd_parse(char cmd[]) {
                         i++;
                 }
                 parse_input.cmd_len = i;        
-        } else if (redirection_detect(cmd_copy)){
+        } else if (redirection_detect(cmd_copy) == 1){
                 // resplit the argu_array
                 // make an argu_array copy
                 token = strtok(cmd_copy, ">");
@@ -139,6 +142,37 @@ struct parse cmd_parse(char cmd[]) {
                 argu_array[j] = NULL;
                 agrument_len = j;
                 redir_index = 1;
+        }
+        else if (redirection_detect(cmd_copy) == 2){
+                // resplit the argu_array
+                // make an argu_array copy
+                token = strtok(cmd_copy, ">&");
+                while( token != NULL ) {
+                        redirection_array[i] = token;
+                        token = strtok(NULL, ">&");
+                        i++;
+                }
+                
+                // delete the space in the name of file
+                if(strstr(redirection_array[i-1], " ")){
+                        token = NULL;
+                        token = strtok(redirection_array[i-1], " ");
+                        redirection_array[i-1] = token;
+                }
+
+                // empty the token
+                token = NULL;
+                token = strtok(redirection_array[0], " ");
+                
+                while( token != NULL ) {
+                        argu_array[j] = token;
+                        token = strtok(NULL, " ");
+                        j++;
+                }
+                cmd_rc = argu_array[0];
+                argu_array[j] = NULL;
+                agrument_len = j;
+                redir_index = 2;
         } else {
                 // split command pushed from user
                 token = strtok(cmd_copy, " ");
@@ -156,7 +190,7 @@ struct parse cmd_parse(char cmd[]) {
         parse_input.command = (char *) malloc(CMDLINE_MAX*sizeof(char));
         parse_input.pipe_arr = (char **) malloc(CMDLINE_MAX*sizeof(char*));
         //printf("=========arr len %d\n",agrument_len);
-        //printf("=========cmd len %d\n",parse_input.cmd_len);
+        //printf("======== =cmd len %d\n",parse_input.cmd_len);
         parse_input.pipe_index = pipe_index;
         parse_input.redir_index = redir_index;
         strcpy(parse_input.command, cmd_rc);
@@ -207,12 +241,17 @@ int sys_call(struct parse parse_rc,char*cmd)
                 /* Child process
                 // end after execution */
                         //printf("proce: 2, cmd:%s, and%sand%s\n",parse_rc.command,parse_rc.argument[0],parse_rc.argument[1]);
+                        //printf("================ %d \n",parse_rc.redir_index);
                         if (parse_rc.redir_index == 1) {
                         fd = open(parse_rc.redir_arr, O_WRONLY| O_CREAT,0644);
                         dup2(fd, STDOUT_FILENO);
                         close(fd);
                         }
-                        
+                        else if (parse_rc.redir_index == 2){
+                        fd = open(parse_rc.redir_arr, O_WRONLY| O_CREAT,0644);
+                        dup2(fd, STDERR_FILENO);
+                        close(fd);        
+                        }
                         execvp(parse_rc.command, parse_rc.argument);
                         perror("execvp");
                         exit(1);
