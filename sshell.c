@@ -26,7 +26,7 @@ int redirection_detect(char* argu) // whether ">" is appeared in the command lin
         if(strstr(argu, "&")){
                 return 2;
         }
-        else if (strstr(argu, "&")){
+        else if (strstr(argu, ">")){
                 return 1;
         }
         return 0;
