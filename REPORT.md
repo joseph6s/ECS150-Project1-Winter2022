@@ -1,4 +1,4 @@
-###Project 1 
+### Project 1 
 
 1. Overall design choices
 ---The very first thing we did is use the combination of exec(),fork(),and wait() to substitude the high level call system(). After that we break the command into two cases - with pipeline and without pipeline.
