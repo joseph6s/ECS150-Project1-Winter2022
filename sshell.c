@@ -207,19 +207,19 @@ int sys_call(struct parse parse_rc,char*cmd) // defined sys_call function, inclu
         if (!strcmp(parse_rc.command, "sls")) {                     
                 char cwd[PATH_MAX];
                 getcwd(cwd,sizeof(cwd)); // get current working directory
-                DIR *streamp;
-                struct dirent *dep;
+                DIR *dirpointer;
+                struct dirent *d;
                 struct stat s;
-                if (!(streamp = opendir(cwd))) {
+                if (!(dirpointer = opendir(cwd))) {
                         exit(1);
                 }
-                while((dep = readdir(streamp)) != NULL) {
-                        if(strcmp(dep->d_name, ".") && strcmp(dep->d_name, "..")) {
-                                stat(dep->d_name, &s);
-                                printf("%s (%ld bytes)\n", dep->d_name,s.st_size);      
+                while((d = readdir(dirpointer)) != NULL) {
+                        if(strcmp(d->d_name, ".") && strcmp(d->d_name, "..")) {
+                                stat(d->d_name, &s);
+                                printf("%s (%ld bytes)\n", d->d_name,s.st_size);      
                         }
                 }
-                if (closedir(streamp)) {
+                if (closedir(dirpointer)) {
                         exit(1);
                 }
                 fprintf(stderr, "+ completed '%s' [%d]\n",
